@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Learning Certificates Manager
  * Plugin URI:        https://github.com/ultramen7/learning-certificates-manager
- * Description:       Manage and display learning certificates grouped by institution with modern cards, tooltips, and image previews.
+ * Description:       Manage and display learning certificates grouped by institution with modern cards, tooltips, and image previews. use [learning_certificates] in page or post
  * Version:           1.0.0
  * Author:            hazman
  * Author URI:        https://zman.my
@@ -13,66 +13,19 @@
  */
 
 if ( ! defined( 'ABSPATH' ) ) {
-    exit;
+    exit; // Exit if accessed directly
 }
 
-// Plugin constants.
-define( 'LCM_VERSION', '1.0.0' );
-define( 'LCM_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
-define( 'LCM_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
-
-/**
- * Load plugin textdomain (for translations).
- */
-function lcm_load_textdomain() {
-    load_plugin_textdomain(
-        'learning-certificates-manager',
-        false,
-        dirname( plugin_basename( __FILE__ ) ) . '/languages'
-    );
+// Define plugin directory & URL constants
+if ( ! defined( 'LCM_PLUGIN_DIR' ) ) {
+    define( 'LCM_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 }
-add_action( 'plugins_loaded', 'lcm_load_textdomain' );
-
-// Includes.
-require_once LCM_PLUGIN_DIR . 'includes/class-lcm-cpt-taxonomy.php';
-require_once LCM_PLUGIN_DIR . 'includes/class-lcm-meta-boxes.php';
-require_once LCM_PLUGIN_DIR . 'includes/class-lcm-shortcode.php';
-
-/**
- * Frontend assets (CSS).
- */
-function lcm_enqueue_frontend_assets() {
-    if ( is_admin() ) {
-        return;
-    }
-
-    wp_enqueue_style(
-        'lcm-frontend',
-        LCM_PLUGIN_URL . 'assets/css/frontend.css',
-        array(),
-        LCM_VERSION
-    );
+if ( ! defined( 'LCM_PLUGIN_URL' ) ) {
+    define( 'LCM_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
 }
-add_action( 'wp_enqueue_scripts', 'lcm_enqueue_frontend_assets' );
 
-/**
- * Admin assets (JS for media picker).
- */
-function lcm_enqueue_admin_assets( $hook ) {
-    global $post_type;
-
-    if ( 'learning_certificate' !== $post_type ) {
-        return;
-    }
-
-    wp_enqueue_media();
-    wp_enqueue_script(
-        'lcm-admin-media',
-        LCM_PLUGIN_URL . 'assets/js/admin-media.js',
-        array( 'jquery' ),
-        LCM_VERSION,
-        true
-    );
-}
-add_action( 'admin_enqueue_scripts', 'lcm_enqueue_admin_assets' );
-
+// Include separate files
+require_once LCM_PLUGIN_DIR . 'includes/cpt-taxonomy.php';
+require_once LCM_PLUGIN_DIR . 'includes/meta-boxes.php';
+require_once LCM_PLUGIN_DIR . 'includes/shortcode-display.php';
+require_once LCM_PLUGIN_DIR . 'includes/assets.php';
