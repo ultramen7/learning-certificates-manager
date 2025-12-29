@@ -25,3 +25,8 @@ Includes:
    * Certificate File = select a file from Media Library
    * Assign a Certificate Group.
 3. Add the shortcode [learning_certificates] to any page.
+4. Optional: Filter by group/category using slugs or IDs:
+   - [learning_certificates category="group-slug"]
+   - [learning_certificates categories="group-a,group-b"]
+   - [learning_certificates group="12"] (term ID)
+   - Aliases supported: category, categories, group, groups

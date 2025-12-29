@@ -7,18 +7,91 @@ if ( ! defined( 'ABSPATH' ) ) {
  * Shortcode: [learning_certificates]
  * Modern card layout + inline CSS + tooltip on hover + entrance animation.
  * If the file is an image, show an image thumbnail tooltip on hover.
+ *
+ * Attributes:
+ * - category / categories / group / groups: comma-separated slugs or IDs of certificate_group terms to display
+ * - order: ASC|DESC (applies to name sorting when no custom order is set)
+ * - orderby: name (default; kept for compatibility)
  */
 function lcm_learning_certificates_shortcode( $atts ) {
     $atts = shortcode_atts( array(
         'order'      => 'ASC',
         'orderby'    => 'name',
+        'category'   => '',
+        'categories' => '',
+        'group'      => '',
+        'groups'     => '',
     ), $atts, 'learning_certificates' );
 
-    // Get all groups
-    $groups = get_terms( array(
-        'taxonomy'   => 'certificate_group',
-        'hide_empty' => false,
-    ) );
+    // Determine requested term filters (accept slugs or IDs)
+    $filter_raw = '';
+    foreach ( array( 'category', 'categories', 'group', 'groups' ) as $k ) {
+        if ( ! empty( $atts[ $k ] ) ) {
+            $filter_raw = $atts[ $k ];
+            break;
+        }
+    }
+
+    if ( is_string( $filter_raw ) ) {
+        $filter_raw = trim( $filter_raw );
+    } else {
+        $filter_raw = '';
+    }
+
+    if ( $filter_raw !== '' ) {
+        $tokens = array_filter( array_map( 'trim', explode( ',', $filter_raw ) ) );
+        $ids    = array();
+        $slugs  = array();
+        foreach ( $tokens as $tok ) {
+            if ( ctype_digit( $tok ) ) {
+                $ids[] = (int) $tok;
+            } else {
+                // sanitize_title handles typical slug normalization
+                $slugs[] = sanitize_title( $tok );
+            }
+        }
+
+        $groups = array();
+        $by_id  = array();
+        $by_slug = array();
+
+        if ( ! empty( $ids ) ) {
+            $by_id = get_terms( array(
+                'taxonomy'   => 'certificate_group',
+                'hide_empty' => false,
+                'include'    => $ids,
+            ) );
+            if ( is_wp_error( $by_id ) ) {
+                $by_id = array();
+            }
+        }
+
+        if ( ! empty( $slugs ) ) {
+            $by_slug = get_terms( array(
+                'taxonomy'   => 'certificate_group',
+                'hide_empty' => false,
+                'slug'       => $slugs,
+            ) );
+            if ( is_wp_error( $by_slug ) ) {
+                $by_slug = array();
+            }
+        }
+
+        // Merge and deduplicate by term_id
+        $map = array();
+        foreach ( array_merge( (array) $by_id, (array) $by_slug ) as $t ) {
+            if ( isset( $t->term_id ) ) {
+                $map[ $t->term_id ] = $t;
+            }
+        }
+        $groups = array_values( $map );
+    } else {
+        // Get all groups
+        $groups = get_terms( array(
+            'taxonomy'   => 'certificate_group',
+            'hide_empty' => false,
+        ) );
+    }
 
     if ( empty( $groups ) || is_wp_error( $groups ) ) {
         return '<p>No certificate groups found.</p>';
