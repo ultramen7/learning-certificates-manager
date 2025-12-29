@@ -14,15 +14,58 @@ function lcm_learning_certificates_shortcode( $atts ) {
         'orderby'    => 'name',
     ), $atts, 'learning_certificates' );
 
+    // Get all groups
     $groups = get_terms( array(
         'taxonomy'   => 'certificate_group',
         'hide_empty' => false,
-        'orderby'    => $atts['orderby'],
-        'order'      => $atts['order'],
     ) );
 
     if ( empty( $groups ) || is_wp_error( $groups ) ) {
         return '<p>No certificate groups found.</p>';
+    }
+
+    // Check if any group has custom order set
+    $has_custom_order = false;
+    foreach ( $groups as $group ) {
+        $order = get_term_meta( $group->term_id, 'certificate_group_order', true );
+        if ( $order !== '' ) {
+            $has_custom_order = true;
+            break;
+        }
+    }
+
+    // Sort groups by custom order if available, otherwise by name
+    if ( $has_custom_order ) {
+        usort( $groups, function( $a, $b ) {
+            $order_a = get_term_meta( $a->term_id, 'certificate_group_order', true );
+            $order_b = get_term_meta( $b->term_id, 'certificate_group_order', true );
+            
+            // If both have no order, sort by name
+            if ( $order_a === '' && $order_b === '' ) {
+                return strcmp( $a->name, $b->name );
+            }
+            // If only one has no order, it goes after
+            if ( $order_a === '' ) {
+                return 1;
+            }
+            if ( $order_b === '' ) {
+                return -1;
+            }
+            // Both have order, compare numerically
+            if ( $order_a == $order_b ) {
+                return strcmp( $a->name, $b->name );
+            }
+            return $order_a - $order_b;
+        } );
+    } else {
+        // Use default WordPress ordering
+        usort( $groups, function( $a, $b ) use ( $atts ) {
+            if ( $atts['orderby'] === 'name' ) {
+                $result = strcmp( $a->name, $b->name );
+                return $atts['order'] === 'DESC' ? -$result : $result;
+            }
+            return 0;
+        } );
     }
 
     ob_start();
@@ -287,7 +330,9 @@ function lcm_learning_certificates_shortcode( $atts ) {
     echo '<div class="lcm-cert-grid">';
 
     foreach ( $groups as $group ) {
-        $cert_query = new WP_Query( array(
+        // First check if any certificate in this group has custom order
+        $has_custom_cert_order = false;
+        $temp_query = new WP_Query( array(
             'post_type'      => 'learning_certificate',
             'posts_per_page' => -1,
             'tax_query'      => array(
@@ -297,9 +342,45 @@ function lcm_learning_certificates_shortcode( $atts ) {
                     'terms'    => $group->term_id,
                 ),
             ),
-            'orderby'        => 'title',
-            'order'          => 'ASC',
+            'fields'         => 'ids',
         ) );
+
+        if ( $temp_query->have_posts() ) {
+            foreach ( $temp_query->posts as $cert_id ) {
+                $order = get_post_meta( $cert_id, '_lcm_certificate_order', true );
+                if ( $order !== '' ) {
+                    $has_custom_cert_order = true;
+                    break;
+                }
+            }
+        }
+        wp_reset_postdata();
+
+        // Query certificates with appropriate ordering
+        $query_args = array(
+            'post_type'      => 'learning_certificate',
+            'posts_per_page' => -1,
+            'tax_query'      => array(
+                array(
+                    'taxonomy' => 'certificate_group',
+                    'field'    => 'term_id',
+                    'terms'    => $group->term_id,
+                ),
+            ),
+        );
+
+        if ( $has_custom_cert_order ) {
+            $query_args['meta_key'] = '_lcm_certificate_order';
+            $query_args['orderby'] = array(
+                'meta_value_num' => 'ASC',
+                'title' => 'ASC',
+            );
+        } else {
+            $query_args['orderby'] = 'title';
+            $query_args['order'] = 'ASC';
+        }
+
+        $cert_query = new WP_Query( $query_args );
 
         if ( $cert_query->have_posts() ) {
             echo '<div class="lcm-cert-group-card">';
