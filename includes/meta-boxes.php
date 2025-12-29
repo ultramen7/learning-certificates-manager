@@ -52,6 +52,7 @@ function lcm_certificate_file_meta_box_callback( $post ) {
     wp_nonce_field( 'lcm_save_certificate_file', 'lcm_certificate_file_nonce' );
 
     $file_url = get_post_meta( $post->ID, '_lcm_certificate_file_url', true );
+    $certificate_order = get_post_meta( $post->ID, '_lcm_certificate_order', true );
     ?>
 <p>
     <label for="lcm_certificate_file_url"><strong>Certificate File</strong></label><br>
@@ -63,6 +64,15 @@ function lcm_certificate_file_meta_box_callback( $post ) {
 </p>
 <p style="font-size: 12px; color: #666;">
     Click <strong>"Select from Media Library"</strong> to choose a file, or paste a file URL manually.
+</p>
+
+<p>
+    <label for="lcm_certificate_order"><strong>Sort Order</strong></label><br>
+    <input type="number" id="lcm_certificate_order" name="lcm_certificate_order"
+        value="<?php echo esc_attr( $certificate_order ); ?>" style="width: 100px;" min="0" step="1">
+</p>
+<p style="font-size: 12px; color: #666;">
+    Enter a number to set custom sort order. Lower numbers appear first. Leave empty for alphabetical sorting.
 </p>
 
 <script>
@@ -128,5 +138,65 @@ function lcm_save_certificate_file_meta( $post_id ) {
         $url = sanitize_text_field( $_POST['lcm_certificate_file_url'] );
         update_post_meta( $post_id, '_lcm_certificate_file_url', $url );
     }
+
+    // Save order
+    if ( isset( $_POST['lcm_certificate_order'] ) ) {
+        $order = absint( $_POST['lcm_certificate_order'] );
+        update_post_meta( $post_id, '_lcm_certificate_order', $order );
+    } else {
+        delete_post_meta( $post_id, '_lcm_certificate_order' );
+    }
 }
 add_action( 'save_post', 'lcm_save_certificate_file_meta' );
+
+/**
+ * Add custom columns to certificates admin list
+ */
+function lcm_certificate_custom_columns( $columns ) {
+    // Insert order column after title
+    $new_columns = array();
+    foreach ( $columns as $key => $value ) {
+        $new_columns[ $key ] = $value;
+        if ( $key === 'title' ) {
+            $new_columns['lcm_order'] = 'Order';
+        }
+    }
+    return $new_columns;
+}
+add_filter( 'manage_learning_certificate_posts_columns', 'lcm_certificate_custom_columns' );
+
+/**
+ * Display order column content
+ */
+function lcm_certificate_custom_column_content( $column, $post_id ) {
+    if ( $column === 'lcm_order' ) {
+        $order = get_post_meta( $post_id, '_lcm_certificate_order', true );
+        echo $order ? esc_html( $order ) : '—';
+    }
+}
+add_action( 'manage_learning_certificate_posts_custom_column', 'lcm_certificate_custom_column_content', 10, 2 );
+
+/**
+ * Make order column sortable
+ */
+function lcm_certificate_sortable_columns( $columns ) {
+    $columns['lcm_order'] = 'lcm_order';
+    return $columns;
+}
+add_filter( 'manage_edit-learning_certificate_sortable_columns', 'lcm_certificate_sortable_columns' );
+
+/**
+ * Custom orderby for order column
+ */
+function lcm_certificate_orderby( $query ) {
+    if ( ! is_admin() || ! $query->is_main_query() ) {
+        return;
+    }
+
+    $orderby = $query->get( 'orderby' );
+    if ( 'lcm_order' === $orderby ) {
+        $query->set( 'meta_key', '_lcm_certificate_order' );
+        $query->set( 'orderby', 'meta_value_num' );
+    }
+}
+add_action( 'pre_get_posts', 'lcm_certificate_orderby' );
